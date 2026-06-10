@@ -34,6 +34,9 @@ function arg(name, fallback) {
 const SERVER = arg("server", "http://localhost:3000");
 const INTENSITIES = arg("intensity", "light,standard,heavy").split(",").map((s) => s.trim());
 const TONE = arg("tone", "casual");
+// Comma-separated AI Gateway slugs to sweep (needs gateway auth). Empty = use
+// whatever the server is configured for (HUMANIZE_MODEL / direct Google / mock).
+const MODELS = arg("models", "").split(",").map((s) => s.trim()).filter(Boolean);
 
 // ---- load corpus ----
 const corpus = JSON.parse(readFileSync(join(__dirname, "corpus.json"), "utf-8"));
@@ -82,46 +85,50 @@ async function main() {
   }
 
   const rows = [];
-  for (const sample of samples) {
-    for (const intensity of INTENSITIES) {
-      process.stdout.write(`• ${sample.id} [${intensity}] ... `);
-      try {
-        const h = await post("/api/humanize", {
-          text: sample.text,
-          purpose: sample.purpose,
-          tone: TONE,
-          intensity,
-        });
-        const dOrig = await post("/api/detect", { text: sample.text });
-        const dHuman = await post("/api/detect", { text: h.humanized });
-        const heurHuman = heuristicPct(dHuman);
+  const modelsToRun = MODELS.length ? MODELS : [null];
+  for (const sweepModel of modelsToRun) {
+    if (sweepModel) log(`\n=== model: ${sweepModel} ===`);
+    for (const sample of samples) {
+      for (const intensity of INTENSITIES) {
+        const label = `${sample.id} [${intensity}]${sweepModel ? ` {${sweepModel}}` : ""}`;
+        process.stdout.write(`• ${label} ... `);
+        try {
+          const body = { text: sample.text, purpose: sample.purpose, tone: TONE, intensity };
+          if (sweepModel) body.model = sweepModel;
 
-        // Push the heuristic score to the humanize trace in Langfuse so eval
-        // runs populate the dashboard. Real GPTZero scores get added by traceId
-        // after the manual web-UI step.
-        if (h.traceId && heurHuman != null) {
-          await post("/api/score", {
-            traceId: h.traceId,
-            scores: [{ name: "heuristic_ai_pct", value: heurHuman, comment: `eval ${intensity}` }],
-          }).catch(() => {});
+          const h = await post("/api/humanize", body);
+          const dOrig = await post("/api/detect", { text: sample.text });
+          const dHuman = await post("/api/detect", { text: h.humanized });
+          const heurHuman = heuristicPct(dHuman);
+
+          // Push the heuristic score to the humanize trace in Langfuse so eval
+          // runs populate the dashboard. Real GPTZero scores get added by traceId
+          // after the manual web-UI step.
+          if (h.traceId && heurHuman != null) {
+            await post("/api/score", {
+              traceId: h.traceId,
+              scores: [{ name: "heuristic_ai_pct", value: heurHuman, comment: `eval ${intensity}` }],
+            }).catch(() => {});
+          }
+
+          rows.push({
+            id: sample.id,
+            genre: sample.genre,
+            intensity,
+            model: h.mode ?? (sweepModel || "default"),
+            traceId: h.traceId ?? null,
+            original: sample.text,
+            humanized: h.humanized,
+            wordsOrig: h.wordCount?.original ?? null,
+            wordsHuman: h.wordCount?.humanized ?? null,
+            heurOrig: heuristicPct(dOrig),
+            heurHuman,
+          });
+          console.log(`done ${h.mode ? `(${h.mode})` : ""}`);
+        } catch (e) {
+          console.log("FAILED");
+          console.error(`   ${e.message}`);
         }
-
-        rows.push({
-          id: sample.id,
-          genre: sample.genre,
-          intensity,
-          traceId: h.traceId ?? null,
-          original: sample.text,
-          humanized: h.humanized,
-          wordsOrig: h.wordCount?.original ?? null,
-          wordsHuman: h.wordCount?.humanized ?? null,
-          heurOrig: heuristicPct(dOrig),
-          heurHuman,
-        });
-        console.log(`done ${h.mode ? `(${h.mode})` : ""}`);
-      } catch (e) {
-        console.log("FAILED");
-        console.error(`   ${e.message}`);
       }
     }
   }
@@ -141,10 +148,10 @@ async function main() {
 
   // Scoreboard table (fill the last two columns by hand from real detectors)
   md += `## Scoreboard\n\n`;
-  md += `| Sample | Genre | Intensity | Words (o→h) | Heuristic %AI (o→h) | GPTZero %AI (humanized) | ZeroGPT %AI (humanized) | Reads clean? (y/n) | Trace |\n`;
-  md += `|---|---|---|---|---|---|---|---|---|\n`;
+  md += `| Sample | Model | Genre | Intensity | Words (o→h) | Heuristic %AI (o→h) | GPTZero %AI (humanized) | ZeroGPT %AI (humanized) | Reads clean? (y/n) | Trace |\n`;
+  md += `|---|---|---|---|---|---|---|---|---|---|\n`;
   for (const r of rows) {
-    md += `| ${r.id} | ${r.genre} | ${r.intensity} | ${r.wordsOrig}→${r.wordsHuman} | ${r.heurOrig}→${r.heurHuman} |  |  |  | ${r.traceId ? r.traceId.slice(0, 8) : "—"} |\n`;
+    md += `| ${r.id} | ${r.model} | ${r.genre} | ${r.intensity} | ${r.wordsOrig}→${r.wordsHuman} | ${r.heurOrig}→${r.heurHuman} |  |  |  | ${r.traceId ? r.traceId.slice(0, 8) : "—"} |\n`;
   }
 
   // Full text pairs for copy-paste

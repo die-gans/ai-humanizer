@@ -113,8 +113,13 @@ const TONE_ADJUSTMENTS: Record<string, string> = {
 
 async function humanizeHandler(req: NextRequest) {
   try {
-    const { text, purpose = "blog", tone = "casual", intensity = "standard" } =
-      await req.json();
+    const {
+      text,
+      purpose = "blog",
+      tone = "casual",
+      intensity = "standard",
+      model: requestedModel,
+    } = await req.json();
 
     if (!text || text.trim().length < 10) {
       return NextResponse.json(
@@ -171,8 +176,15 @@ Output ONLY the rewritten text. No explanations, no markdown code blocks, no pre
     let model: LanguageModel | undefined;
     let mode: string;
     if (hasGatewayAuth) {
-      model = GATEWAY_MODEL; // plain "provider/model" string routes through AI Gateway
-      mode = `gateway:${GATEWAY_MODEL}`;
+      // Per-request slug override lets the eval harness sweep providers in one
+      // server session. NOTE: lock this down (allowlist) before a public launch
+      // so callers can't route to arbitrary models on your gateway credits.
+      const slug =
+        typeof requestedModel === "string" && requestedModel
+          ? requestedModel
+          : GATEWAY_MODEL;
+      model = slug; // plain "provider/model" string routes through AI Gateway
+      mode = `gateway:${slug}`;
     } else if (googleKey && googleKey.length >= 10) {
       model = createGoogleGenerativeAI({ apiKey: googleKey })(MODEL_ID);
       mode = `gemini:${MODEL_ID}`;
