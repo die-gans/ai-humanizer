@@ -1,8 +1,8 @@
 # AI Humanizer — Competitive Analysis & Product Requirements Document
 
-> **Status:** Research complete | **Next:** Decision on build vs. abandon  
+> **Status:** MVP Implementation Complete (Auth, Design, Prompt Engine) | **Next:** Stripe Integration & Production Launch  
 > **Analysed competitor:** [TheHumanizer.ai](https://www.thehumanizer.ai/)  
-> **Date:** 2026-06-05
+> **Date:** 2026-06-10
 
 ---
 
@@ -205,55 +205,47 @@ A transparent, high-quality AI writing refinement tool that helps users transfor
 ### 6.3 MVP Feature Set
 
 #### Core (Must Have)
-- [ ] Text paste input with real-time word count
-- [ ] **Purpose selector:** Academic Essay / Blog Post / Marketing Copy / Technical Doc / Creative Writing / Casual
-- [ ] **Tone slider:** Formal ↔ Casual, Simple ↔ Complex
-- [ ] Humanize engine with 3 intensity levels: Light / Standard / Heavy
-- [ ] Side-by-side before/after comparison with diff highlighting
-- [ ] Built-in detector scan against GPTZero + Originality.ai (free tier)
+- [x] Text paste input with real-time word count
+- [x] **Purpose selector:** Academic Essay / Blog Post / Marketing Copy / Technical Doc / Creative Writing / Casual
+- [x] **Tone selector:** Formal, Casual, Simple, Complex
+- [x] Humanize engine with 3 intensity levels: Light / Standard / Heavy
+- [x] **Remote Prompt Management:** Versioned templates via Langfuse
+- [x] **Design Normalization:** Linear.app "Design.md" implementation
+- [x] **Auth & Credits:** Supabase integration with word-count deduction
+- [ ] Side-by-side before/after comparison with diff highlighting (UI partially implemented)
+- [x] Built-in detector scan: Heuristic AI Pattern check
+- [ ] Built-in detector scan: GPTZero API (Partial: integrated in API, requires key)
 - [ ] Export: Copy, Download TXT, Download DOCX
-- [ ] Free tier: 500 words/day, no signup required
-- [ ] Auth (Google, email) for history & higher limits
+- [x] Free tier: 500 words/day guest limit, 500 words/mo for new accounts
+- [x] Auth (Google, email) via Supabase for history & credits
 
 #### Differentiators (Should Have)
+- [ ] **"Ultra" Bypass Mode:** Adversarial self-correction loop
 - [ ] **Change explanations:** Hover over highlighted text → see why it was changed
 - [ ] **File upload:** DOCX, PDF, TXT
-- [ ] **Batch processing:** Upload 10+ files, process queue
 - [ ] **Saved transformations:** Searchable history
-- [ ] **Chrome extension:** Humanize text on any webpage (Gmail, Google Docs, Notion)
-- [ ] **API:** REST API with key management, usage tracking, webhooks
 
-#### Moat Builders (Could Have)
-- [ ] **Monthly benchmark report:** Publicly publish detector bypass rates for all major humanizers (including ourselves) — radical transparency
-- [ ] **Custom voice training:** Upload your past writing → model learns your style
-- [ ] **Team brand voice:** Shared style guides across team
-- [ ] **Plagiarism check integration:** Ensure humanized text is original
-- [ ] **Mobile app:** iOS + Android
+### 6.4 Tech Stack (Confirmed)
 
-### 6.4 Tech Stack Recommendation
+| Layer | Choice | Status |
+|-------|--------|--------|
+| **Frontend** | Next.js 15 + Tailwind + shadcn/ui | **Live** |
+| **Design** | Linear.app / Design.md Standard | **Live** |
+| **Backend** | Next.js API routes (Node.js runtime) | **Live** |
+| **Database** | Supabase (PostgreSQL) | **Live** |
+| **Auth** | Supabase Auth | **Live** |
+| **Prompt Mgmt** | Langfuse Remote Prompts | **Live** |
+| **Tracing** | Langfuse + OpenTelemetry | **Live** |
+| **AI Engine** | Google Gemini 2.5 Flash | **Live** |
+| **Payments** | Stripe | **Pending** |
 
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| **Frontend** | Next.js 15 + Tailwind + shadcn/ui | Familiar (Blog, TRAKKA), fast, SEO-friendly |
-| **Backend** | Next.js API routes + Vercel | Serverless, scales to zero, same repo |
-| **Database** | Supabase (PostgreSQL) | Familiar stack, auth built-in, row-level security |
-| **AI Engine** | OpenAI GPT-4o / Claude Sonnet 4 via API | Best-in-class writing quality; easy to swap |
-| **Detector APIs** | GPTZero API, Originality.ai API | Real verification, not fake scores |
-| **File processing** | AWS S3 + Lambda | PDF/DOCX parse, transform, re-export |
-| **Payments** | Stripe | Subscriptions + usage-based metering |
-| **Chrome ext** | Plasmo framework | Modern React-based extension dev |
-| **API docs** | Scalar / Swagger UI | Developer experience |
-
-### 6.5 Pricing Model (Proposed)
+### 6.5 Pricing Model (Subscription-Based)
 
 | Tier | Price | Includes |
 |------|-------|----------|
-| **Free** | $0 | 500 words/day, 3 transformations/day, web only, standard detectors |
-| **Pro** | $12/mo | 10,000 words/mo, unlimited transformations, file upload, history, all detectors |
-| **Power** | $29/mo | 50,000 words/mo, API access (10K words/mo), Chrome extension, batch processing |
-| **Team** | $49/mo/seat | Everything in Power + shared brand voices, admin dashboard, priority support |
-| **Enterprise** | Custom | SSO, audit logs, SLA, on-prem option, dedicated account manager |
-| **API Only** | $0.002/word | Pay-as-you-go, volume discounts at 1M+ words |
+| **Free** | $0 | 500 words / day guest, 500 words / mo auth |
+| **Pro** | $15/mo | 25,000 words / mo, All Intensities, Ultra Mode (Future) |
+| **Business** | $49/mo | 100,000 words / mo, API Access, Team Profiles |
 
 ### 6.6 Success Metrics
 
