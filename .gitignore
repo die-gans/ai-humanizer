@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agent tooling (skills are reinstallable via skills-lock.json)
+/.agents
+/.claude
+
+# eval runtime artifacts
+/eval/results
+/eval/waitlist.jsonl

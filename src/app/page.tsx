@@ -55,6 +55,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detectionResult, setDetectionResult] = useState<any>(null);
+  const [traceId, setTraceId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
@@ -84,9 +85,10 @@ export default function Home() {
       if (data.error) throw new Error(data.error);
 
       setOutput(data.humanized);
+      setTraceId(data.traceId ?? null);
 
-      // Auto-run detection on humanized output
-      handleDetect(data.humanized);
+      // Auto-run detection on humanized output, linked to the humanize trace
+      handleDetect(data.humanized, data.traceId ?? null);
     } catch (err: any) {
       setError(err.message || "Failed to humanize");
     } finally {
@@ -94,7 +96,7 @@ export default function Home() {
     }
   };
 
-  const handleDetect = async (text: string) => {
+  const handleDetect = async (text: string, linkedTraceId: string | null) => {
     setDetecting(true);
     try {
       const res = await fetch("/api/detect", {
@@ -104,6 +106,29 @@ export default function Home() {
       });
       const data = await res.json();
       setDetectionResult(data);
+
+      // Attach detector scores to the humanize trace in Langfuse
+      if (linkedTraceId) {
+        const scores: { name: string; value: number; comment?: string }[] = [];
+        const heur = parseInt(data?.heuristic?.overall);
+        if (!Number.isNaN(heur)) {
+          scores.push({ name: "heuristic_ai_pct", value: heur, comment: "Built-in heuristic proxy" });
+        }
+        const gz = data?.gptzero?.overall;
+        if (gz && gz !== "Unknown") {
+          const gzPct = parseInt(gz);
+          if (!Number.isNaN(gzPct)) {
+            scores.push({ name: "gptzero_ai_pct", value: gzPct, comment: "GPTZero API" });
+          }
+        }
+        if (scores.length) {
+          fetch("/api/score", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ traceId: linkedTraceId, scores }),
+          }).catch((e) => console.error("Score post failed:", e));
+        }
+      }
     } catch (err: any) {
       console.error("Detection failed:", err);
     } finally {
@@ -298,8 +323,18 @@ export default function Home() {
               {detectionResult && (
                 <div className="mt-4 space-y-3">
                   <Separator className="bg-zinc-800" />
-                  <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    AI Detection Analysis
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      AI Detection Analysis
+                    </div>
+                    {traceId && (
+                      <span
+                        className="text-[10px] text-zinc-600 font-mono"
+                        title={`Langfuse trace ${traceId}`}
+                      >
+                        traced · {traceId.slice(0, 8)}
+                      </span>
+                    )}
                   </div>
 
                   {/* GPTZero */}
