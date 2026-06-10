@@ -1,0 +1,41 @@
+{
+  "description": "Robustness / adversarial corpus — the humanizer analog of dans-blog's red-teaming. Hard inputs that tend to break humanizers: code, citations, structured lists, non-English, and edge lengths. Use with `node eval/run-eval.mjs --corpus robustness`. Watch the assertions (esp. word_count_delta / changed) and judge faithfulness — these inputs are where meaning gets mangled or formatting destroyed.",
+  "samples": [
+    {
+      "id": "robust-code-block",
+      "genre": "technical",
+      "purpose": "technical",
+      "text": "To debounce a function in JavaScript, you can use the following implementation. First, define a higher-order function that accepts a callback and a delay. It returns a new function that clears the previous timer and sets a new one. Here is the code: function debounce(fn, ms) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; }. This ensures the callback only fires after the user stops triggering the event for the specified duration."
+    },
+    {
+      "id": "robust-citations",
+      "genre": "academic",
+      "purpose": "academic",
+      "text": "Recent studies have demonstrated significant correlations between sleep quality and cognitive performance (Smith et al., 2021). Furthermore, longitudinal data suggests that chronic sleep deprivation impairs memory consolidation (Jones & Lee, 2019; Garcia, 2020). It is important to note that these findings have been replicated across multiple populations (Chen et al., 2022, p. 47). Consequently, researchers recommend a minimum of seven hours of sleep per night for optimal cognitive function."
+    },
+    {
+      "id": "robust-numbered-list",
+      "genre": "blog",
+      "purpose": "blog",
+      "text": "Here are the five key steps to setting up a home network. Step 1: Choose a router that supports your internet speed. Step 2: Position the router centrally in your home for optimal coverage. Step 3: Configure your network name and a strong password. Step 4: Enable WPA3 encryption for security. Step 5: Test your connection speed in different rooms. Following these steps will ensure a reliable and secure home network."
+    },
+    {
+      "id": "robust-spanish",
+      "genre": "blog",
+      "purpose": "blog",
+      "text": "En el mundo acelerado de hoy, la productividad se ha vuelto más importante que nunca. Ya sea que seas estudiante, profesional o emprendedor, maximizar tu rendimiento es esencial para el éxito. Existen varias estrategias que pueden ayudarte a ser más productivo. En primer lugar, es crucial priorizar tus tareas de manera efectiva. En segundo lugar, debes eliminar las distracciones. En conclusión, la productividad no se trata de trabajar más duro, sino de trabajar de manera más inteligente."
+    },
+    {
+      "id": "robust-very-short",
+      "genre": "casual",
+      "purpose": "casual",
+      "text": "Artificial intelligence is transforming industries. It is important to note that this technology offers significant benefits."
+    },
+    {
+      "id": "robust-mixed-format",
+      "genre": "marketing",
+      "purpose": "marketing",
+      "text": "Our platform offers three core benefits: 1) increased efficiency, 2) reduced costs, and 3) improved scalability. Pricing starts at $29/month for the Basic plan and $99/month for Pro. Contact sales@example.com or visit https://example.com/demo to schedule a demonstration. Furthermore, all plans include 24/7 support and a 30-day money-back guarantee. Don't miss out on this opportunity to transform your workflow today."
+    }
+  ]
+}

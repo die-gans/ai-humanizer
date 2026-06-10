@@ -22,6 +22,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runAssertions } from "./assertions.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -37,9 +38,14 @@ const TONE = arg("tone", "casual");
 // Comma-separated AI Gateway slugs to sweep (needs gateway auth). Empty = use
 // whatever the server is configured for (HUMANIZE_MODEL / direct Google / mock).
 const MODELS = arg("models", "").split(",").map((s) => s.trim()).filter(Boolean);
+// --judge runs the LLM-as-judge (faithfulness/quality) — opt-in; costs LLM calls.
+const JUDGE = args.includes("--judge");
+// --corpus robustness loads corpus-robustness.json (hard inputs); default corpus.json.
+const CORPUS = arg("corpus", "default");
 
 // ---- load corpus ----
-const corpus = JSON.parse(readFileSync(join(__dirname, "corpus.json"), "utf-8"));
+const corpusFile = CORPUS === "default" ? "corpus.json" : `corpus-${CORPUS}.json`;
+const corpus = JSON.parse(readFileSync(join(__dirname, corpusFile), "utf-8"));
 const samples = corpus.samples;
 
 async function post(path, body) {
@@ -87,7 +93,7 @@ async function main() {
   const rows = [];
   const modelsToRun = MODELS.length ? MODELS : [null];
   for (const sweepModel of modelsToRun) {
-    if (sweepModel) log(`\n=== model: ${sweepModel} ===`);
+    if (sweepModel) console.log(`\n=== model: ${sweepModel} ===`);
     for (const sample of samples) {
       for (const intensity of INTENSITIES) {
         const label = `${sample.id} [${intensity}]${sweepModel ? ` {${sweepModel}}` : ""}`;
@@ -101,14 +107,27 @@ async function main() {
           const dHuman = await post("/api/detect", { text: h.humanized });
           const heurHuman = heuristicPct(dHuman);
 
-          // Push the heuristic score to the humanize trace in Langfuse so eval
-          // runs populate the dashboard. Real GPTZero scores get added by traceId
-          // after the manual web-UI step.
-          if (h.traceId && heurHuman != null) {
-            await post("/api/score", {
+          // Structured assertions (free, deterministic).
+          const a = runAssertions(sample.text, h.humanized);
+
+          // Optional LLM-as-judge (faithfulness + quality).
+          let judge = null;
+          if (JUDGE && h.traceId) {
+            judge = await post("/api/judge", {
               traceId: h.traceId,
-              scores: [{ name: "heuristic_ai_pct", value: heurHuman, comment: `eval ${intensity}` }],
-            }).catch(() => {});
+              original: sample.text,
+              humanized: h.humanized,
+            }).catch((e) => ({ error: e.message }));
+          }
+
+          // Push scores to the humanize trace in Langfuse. Heuristic is a proxy;
+          // real GPTZero scores get added by traceId after the manual web-UI step.
+          // Judge scores are attached server-side by /api/judge.
+          if (h.traceId) {
+            const scores = [];
+            if (heurHuman != null) scores.push({ name: "heuristic_ai_pct", value: heurHuman, comment: `eval ${intensity}` });
+            scores.push({ name: "assertions_pass_rate", value: a.passRate, comment: `${a.passed}/${a.total}` });
+            if (scores.length) await post("/api/score", { traceId: h.traceId, scores }).catch(() => {});
           }
 
           rows.push({
@@ -123,8 +142,13 @@ async function main() {
             wordsHuman: h.wordCount?.humanized ?? null,
             heurOrig: heuristicPct(dOrig),
             heurHuman,
+            assertions: `${a.passed}/${a.total}`,
+            assertFails: a.results.filter((r) => !r.passed).map((r) => r.name),
+            judgeFaith: judge && Number.isFinite(judge.faithfulness) ? judge.faithfulness : null,
+            judgeQuality: judge && Number.isFinite(judge.quality) ? judge.quality : null,
           });
-          console.log(`done ${h.mode ? `(${h.mode})` : ""}`);
+          const judgeStr = judge && judge.faithfulness != null ? ` judge F:${judge.faithfulness} Q:${judge.quality}` : "";
+          console.log(`done ${h.mode ? `(${h.mode})` : ""} [${a.passed}/${a.total}]${judgeStr}`);
         } catch (e) {
           console.log("FAILED");
           console.error(`   ${e.message}`);
@@ -148,10 +172,17 @@ async function main() {
 
   // Scoreboard table (fill the last two columns by hand from real detectors)
   md += `## Scoreboard\n\n`;
-  md += `| Sample | Model | Genre | Intensity | Words (o→h) | Heuristic %AI (o→h) | GPTZero %AI (humanized) | ZeroGPT %AI (humanized) | Reads clean? (y/n) | Trace |\n`;
-  md += `|---|---|---|---|---|---|---|---|---|---|\n`;
+  md += `| Sample | Model | Intensity | Words (o→h) | Heur %AI (o→h) | Assert | Judge F/Q | GPTZero %AI | ZeroGPT %AI | Clean? | Trace |\n`;
+  md += `|---|---|---|---|---|---|---|---|---|---|---|\n`;
   for (const r of rows) {
-    md += `| ${r.id} | ${r.model} | ${r.genre} | ${r.intensity} | ${r.wordsOrig}→${r.wordsHuman} | ${r.heurOrig}→${r.heurHuman} |  |  |  | ${r.traceId ? r.traceId.slice(0, 8) : "—"} |\n`;
+    const judgeCell = r.judgeFaith != null ? `${r.judgeFaith}/${r.judgeQuality}` : "—";
+    md += `| ${r.id} | ${r.model} | ${r.intensity} | ${r.wordsOrig}→${r.wordsHuman} | ${r.heurOrig}→${r.heurHuman} | ${r.assertions} | ${judgeCell} |  |  |  | ${r.traceId ? r.traceId.slice(0, 8) : "—"} |\n`;
+  }
+  // Surface assertion failures (deterministic — worth eyeballing).
+  const withFails = rows.filter((r) => r.assertFails && r.assertFails.length);
+  if (withFails.length) {
+    md += `\n**Assertion failures:**\n`;
+    for (const r of withFails) md += `- ${r.id} [${r.intensity}] (${r.model}): ${r.assertFails.join(", ")}\n`;
   }
 
   // Full text pairs for copy-paste

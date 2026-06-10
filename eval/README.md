@@ -12,9 +12,27 @@ echo 'GOOGLE_API_KEY=your_key' >> .env.local
 npm run dev
 
 # 3. Run the harness (another terminal)
-npm run eval                          # all intensities
+npm run eval                          # all intensities, default corpus, assertions on
 node eval/run-eval.mjs --intensity standard --tone casual
+node eval/run-eval.mjs --models "google/gemini-2.5-flash,openai/gpt-5.4"   # provider sweep (needs gateway)
+node eval/run-eval.mjs --corpus robustness                                # hard inputs (code, citations, non-English)
+node eval/run-eval.mjs --judge                                            # add LLM-as-judge (faithfulness/quality)
 ```
+
+## Eval layers (adapted from dans-blog)
+
+1. **Structured assertions** (always on, free, no LLM) — per output: non-empty, min words,
+   changed, word-count delta in bounds, no banned AI phrases. Failures are listed in the report
+   and pushed to Langfuse as `assertions_pass_rate`.
+2. **LLM-as-judge** (`--judge`, opt-in — costs LLM calls) — scores `judge_faithfulness`
+   (meaning preserved) and `judge_quality` (reads clean/human) 0-1 via `/api/judge`, attached
+   to each trace. This is the half of the kill criterion detectors can't measure.
+3. **Robustness corpus** (`--corpus robustness`) — adversarial inputs that break humanizers
+   (code blocks, citations, lists, Spanish, edge lengths). Watch `word_count_delta` and judge
+   faithfulness here.
+
+Together with the detector scores, a trace carries the full picture: **beats detection** (heuristic/GPTZero)
+**and didn't garble the text** (assertions + judge).
 
 It hits the **real** `/api/humanize` + `/api/detect` routes (same code path as the app),
 then writes `eval/results/run-<timestamp>.md`.
