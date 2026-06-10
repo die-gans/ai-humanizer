@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Humanizer
 
-## Getting Started
+> Transform AI-generated text into natural, human-like prose. Built to beat detection tools.
 
-First, run the development server:
+## Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+AI Humanizer is a Next.js application that takes robotic, AI-generated text and rewrites it with natural rhythm, varied sentence structure, and authentic voice. The goal is simple: **make AI text undetectable** while preserving meaning.
+
+This POC validates the core concept before committing to full production build.
+
+## Why This Exists
+
+Current humanizers (TheHumanizer.ai, Undetectable.ai, StealthGPT) are:
+- **Expensive** ($9-40/mo for basic tiers)
+- **Ineffective** (14/16 fail modern detectors per independent testing)
+- **Opaque** (no visibility into what changes are made)
+- **One-size-fits-all** (no control over tone, purpose, or intensity)
+
+We can do better.
+
+## Features
+
+- **Purpose-aware rewriting** — Academic, blog, marketing, technical, creative, casual
+- **Tone control** — Formal, casual, simple, complex
+- **Intensity slider** — Light, standard, heavy transformations
+- **Real-time detection scoring** — Heuristic analysis + GPTZero integration
+- **Side-by-side diff** — See exactly what changed
+- **Dark theme** — Easy on the eyes
+
+## Tech Stack
+
+- Next.js 15 (App Router)
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Google Generative AI (Gemini) / OpenRouter (multi-provider)
+
+## Project Structure
+
+```
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── humanize/route.ts    # Main humanization API
+│   │   │   └── detect/route.ts      # Detection scoring API
+│   │   ├── page.tsx                  # Main UI
+│   │   └── layout.tsx                # Root layout
+│   ├── components/ui/                # shadcn components
+│   └── lib/utils.ts
+├── PRD.md                            # Product Requirements Document
+├── NORTH_STAR.md                     # Project manifesto & principles
+└── README.md                         # This file
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Docs
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **[PRD.md](PRD.md)** — Full competitive analysis, feature spec, build plan
+- **[NORTH_STAR.md](NORTH_STAR.md)** — Core principles: works, controls, transparent
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Running Locally
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Set `GOOGLE_API_KEY` or `OPENROUTER_API_KEY` in `.env.local` for LLM-powered humanization. Without a key, falls back to mock mode.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Status
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**POC Phase** — Validating AI engine quality and bypass rates before production build.
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
