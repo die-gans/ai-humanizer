@@ -6,11 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "eval": "node eval/run-eval.mjs",
+    "models": "node eval/list-models.mjs"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.80",
     "@base-ui/react": "^1.5.0",
     "@google/generative-ai": "^0.24.1",
+    "@langfuse/client": "^5.4.1",
+    "@langfuse/otel": "^5.4.1",
+    "@langfuse/tracing": "^5.4.1",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/sdk-node": "^0.218.0",
+    "@opentelemetry/sdk-trace-node": "^2.7.1",
+    "ai": "^6.0.199",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

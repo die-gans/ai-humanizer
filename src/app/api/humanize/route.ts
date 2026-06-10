@@ -1,11 +1,32 @@
-import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextRequest, NextResponse, after } from "next/server";
+import { generateText, type LanguageModel } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import {
+  observe,
+  updateActiveObservation,
+  setActiveTraceIO,
+  getActiveTraceId,
+} from "@langfuse/tracing";
+import { langfuseSpanProcessor } from "@/lib/langfuse";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
+// OpenTelemetry tracing requires the Node.js runtime (not Edge).
+export const runtime = "nodejs";
+
+// Model routed through Vercel AI Gateway ("provider/model" slug). Override with
+// HUMANIZE_MODEL to sweep providers (e.g. openai/gpt-5.4, anthropic/claude-sonnet-4.6)
+// in the detector-bypass tuning loop. Confirm slugs via gateway.getAvailableModels().
+const GATEWAY_MODEL = process.env.HUMANIZE_MODEL || "google/gemini-2.5-flash";
+
+// Model ID for the direct Google fallback (when no AI Gateway auth is present).
+const MODEL_ID = "gemini-2.5-flash";
+
 function getGoogleKey(): string {
   if (process.env.GOOGLE_API_KEY) return process.env.GOOGLE_API_KEY;
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+    return process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   try {
     const hermesEnv = readFileSync(join(homedir(), ".hermes", ".env"), "utf-8");
     const match = hermesEnv.match(/GOOGLE_API_KEY=(.+)/);
@@ -13,8 +34,6 @@ function getGoogleKey(): string {
   } catch { /* ignore */ }
   return "";
 }
-
-const genAI = new GoogleGenerativeAI(getGoogleKey());
 
 function mockHumanize(text: string, purpose: string, tone: string, intensity: string): string {
   // Realistic mock transformations based on purpose/tone/intensity
@@ -92,10 +111,15 @@ const TONE_ADJUSTMENTS: Record<string, string> = {
   complex: "Use sophisticated vocabulary, complex sentence structures, nuanced expression.",
 };
 
-export async function POST(req: NextRequest) {
+async function humanizeHandler(req: NextRequest) {
   try {
-    const { text, purpose = "blog", tone = "casual", intensity = "standard" } =
-      await req.json();
+    const {
+      text,
+      purpose = "blog",
+      tone = "casual",
+      intensity = "standard",
+      model: requestedModel,
+    } = await req.json();
 
     if (!text || text.trim().length < 10) {
       return NextResponse.json(
@@ -141,43 +165,91 @@ Intensity: ${intensityPrompt}
 
 Output ONLY the rewritten text. No explanations, no markdown code blocks, no preamble.`;
 
-    // Check if we have a valid API key
-    const apiKey = getGoogleKey();
+    // Resolve which model to call. Prefer AI Gateway (multi-provider, one auth —
+    // ideal for sweeping models in the tuning loop); fall back to a direct Google
+    // key so the free local path still works; else mock.
+    const hasGatewayAuth = !!(
+      process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN
+    );
+    const googleKey = getGoogleKey();
+
+    let model: LanguageModel | undefined;
+    let mode: string;
+    if (hasGatewayAuth) {
+      // Per-request slug override lets the eval harness sweep providers in one
+      // server session. NOTE: lock this down (allowlist) before a public launch
+      // so callers can't route to arbitrary models on your gateway credits.
+      const slug =
+        typeof requestedModel === "string" && requestedModel
+          ? requestedModel
+          : GATEWAY_MODEL;
+      model = slug; // plain "provider/model" string routes through AI Gateway
+      mode = `gateway:${slug}`;
+    } else if (googleKey && googleKey.length >= 10) {
+      model = createGoogleGenerativeAI({ apiKey: googleKey })(MODEL_ID);
+      mode = `gemini:${MODEL_ID}`;
+    } else {
+      mode = "mock";
+    }
+
     let humanized: string;
-    
-    if (!apiKey || apiKey.length < 10) {
+    if (!model) {
       // Mock mode: simulate humanization with realistic transformations
       humanized = mockHumanize(text, purpose, tone, intensity);
     } else {
       try {
-        const model = genAI.getGenerativeModel({
-          model: "gemini-1.5-flash-latest",
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: Math.min(text.length * 2 + 500, 4000),
+        const { text: generated } = await generateText({
+          model,
+          system: systemPrompt,
+          prompt: "Text to rewrite:\n" + text,
+          temperature: 0.8,
+          maxOutputTokens: Math.min(text.length * 2 + 500, 4000),
+          // Emits OpenTelemetry spans (model, tokens, latency) captured by Langfuse.
+          experimental_telemetry: {
+            isEnabled: true,
+            functionId: "humanize",
+            metadata: { purpose, tone, intensity },
           },
         });
 
-        const result = await model.generateContent({
-          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\nText to rewrite:\n" + text }] }],
-        });
-
-        humanized = result.response.text() || text;
+        humanized = generated?.trim() || text;
       } catch (apiError: any) {
-        console.error("API error, falling back to mock:", apiError.message);
+        console.error("Model error, falling back to mock:", apiError.message);
         humanized = mockHumanize(text, purpose, tone, intensity);
+        mode = "mock-fallback";
       }
     }
 
+    humanized = humanized.trim();
+
+    // Record meaningful input/output on the root observation (not raw request
+    // args), and promote the same to the trace level for the traces list view.
+    const ioInput = { text, purpose, tone, intensity };
+    updateActiveObservation(
+      { input: ioInput, output: humanized, metadata: { mode, model: MODEL_ID } },
+      { asType: "span" }
+    );
+    setActiveTraceIO({ input: ioInput, output: humanized });
+
+    // Returned so the client / eval harness can attach detector scores to this trace.
+    const traceId = getActiveTraceId();
+
+    // Ensure spans are exported before the serverless function freezes.
+    after(async () => {
+      await langfuseSpanProcessor.forceFlush();
+    });
+
     return NextResponse.json({
       original: text,
-      humanized: humanized.trim(),
+      humanized,
+      traceId,
+      mode,
       purpose,
       tone,
       intensity,
       wordCount: {
         original: text.split(/\s+/).length,
-        humanized: humanized.trim().split(/\s+/).length,
+        humanized: humanized.split(/\s+/).length,
       },
     });
   } catch (error: any) {
@@ -188,3 +260,12 @@ Output ONLY the rewritten text. No explanations, no markdown code blocks, no pre
     );
   }
 }
+
+// Wrapping with `observe` creates the root "humanize" observation/trace; the
+// AI SDK's telemetry spans (model, tokens, latency) nest under it. We disable
+// auto-capture so our explicit input/output (not the NextResponse) is kept.
+export const POST = observe(humanizeHandler, {
+  name: "humanize",
+  captureInput: false,
+  captureOutput: false,
+});

@@ -1,0 +1,41 @@
+{
+  "description": "Fixed corpus of deliberately AI-flavored text samples for the humanizer eval harness. Each is the kind of output a model produces with no humanization: uniform sentence length, hedging, 'delve/leverage', lists of three, formulaic transitions. The harness rewrites each and we score original vs. humanized against real detectors.",
+  "samples": [
+    {
+      "id": "academic-climate",
+      "genre": "academic",
+      "purpose": "academic",
+      "text": "Climate change represents one of the most significant challenges facing humanity in the modern era. It is important to note that rising global temperatures have far-reaching consequences for ecosystems, economies, and societies. Furthermore, the scientific consensus is clear: human activity is the primary driver of these changes. Consequently, urgent action is required to mitigate the worst effects. Researchers have identified three key areas of concern: rising sea levels, increasing frequency of extreme weather events, and loss of biodiversity. Moreover, these impacts are interconnected and mutually reinforcing. In conclusion, addressing climate change requires a coordinated global response that leverages both technological innovation and policy reform."
+    },
+    {
+      "id": "blog-productivity",
+      "genre": "blog",
+      "purpose": "blog",
+      "text": "In today's fast-paced world, productivity has become more important than ever. Whether you are a student, a professional, or an entrepreneur, maximizing your output is essential for success. There are several strategies that can help you become more productive. First, it is crucial to prioritize your tasks effectively. Second, you should eliminate distractions and create a focused work environment. Third, taking regular breaks can actually improve your overall efficiency. By implementing these techniques, you can unlock your full potential and achieve your goals. Remember, productivity is not about working harder; it is about working smarter."
+    },
+    {
+      "id": "marketing-saas",
+      "genre": "marketing",
+      "purpose": "marketing",
+      "text": "Introducing our revolutionary new platform designed to transform the way you work. Our cutting-edge solution leverages state-of-the-art technology to deliver unparalleled results. With our intuitive interface, you can streamline your workflow, boost productivity, and drive growth like never before. Whether you are a small business or a large enterprise, our platform scales to meet your needs. Join thousands of satisfied customers who have already experienced the difference. Don't miss out on this game-changing opportunity. Sign up today and take your business to the next level."
+    },
+    {
+      "id": "technical-api",
+      "genre": "technical",
+      "purpose": "technical",
+      "text": "When designing a RESTful API, it is essential to follow established best practices to ensure scalability and maintainability. First, you should use appropriate HTTP methods for each operation. Additionally, it is important to implement proper error handling and return meaningful status codes. Furthermore, versioning your API is crucial for backward compatibility. You should also consider implementing rate limiting to prevent abuse and ensure fair usage. Authentication and authorization are equally important aspects of API design. By adhering to these principles, you can create a robust and reliable API that serves your users effectively."
+    },
+    {
+      "id": "academic-history",
+      "genre": "academic",
+      "purpose": "academic",
+      "text": "The Industrial Revolution was a pivotal period in human history that fundamentally transformed society. It is widely acknowledged that this era marked the transition from agrarian economies to industrialized ones. During this time, numerous technological innovations emerged that revolutionized manufacturing and production. Moreover, the rise of factories led to significant social and economic changes. Urbanization accelerated as people migrated from rural areas to cities in search of employment. Additionally, new social classes emerged, reshaping the existing social hierarchy. In summary, the Industrial Revolution laid the foundation for the modern industrialized world we know today."
+    },
+    {
+      "id": "blog-travel",
+      "genre": "blog",
+      "purpose": "blog",
+      "text": "Traveling is one of the most rewarding experiences a person can have. It allows you to explore new cultures, meet interesting people, and create lasting memories. When planning your next trip, there are several factors to consider. First and foremost, you need to determine your budget and destination. Next, it is important to research the local customs and attractions. Additionally, packing appropriately can make a significant difference in your travel experience. Whether you prefer relaxing on a beach or exploring bustling cities, there is a destination out there for everyone. Ultimately, traveling broadens your horizons and enriches your life in countless ways."
+    }
+  ]
+}
